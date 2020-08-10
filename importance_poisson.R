@@ -10,21 +10,10 @@ library(ucminf)
 
 
 
-set.seed(42)
-
-
-
-#### Integration of a function: example ####
-
-S <- 100
-alpha <- runif(S, 1, 2)
-
-I.hat <- 1/S*sum(exp(alpha))
-
-
-
 #### Functions ####
 
+
+# Kalman filter and smoother
 KFS <- function(y, Tmatrix, Z, H, Q, nstates, d, P10, outofsample){
   
   len <- length(y)
@@ -52,13 +41,12 @@ KFS <- function(y, Tmatrix, Z, H, Q, nstates, d, P10, outofsample){
   for (i in 1:len){
     epshatoutofsample <- y[i] - Z%*%xttm1[,i]
     Fmatrix <- Z%*%Pttm1[[i]]%*%t(Z) + H[i,i]
-    #Fmatrix[1,1] <- ifelse(!is.na(epshatoutofsample[1,]), Fmatrix[1,1], parP10[1])
     
     Fmatrix.inv <- 1/Fmatrix
-    Kg <- Tmatrix%*%Pttm1[[i]]%*%t(Z)%*%Fmatrix.inv #kalman gain
-    xtt[,i] <- xttm1[,i]+Pttm1[[i]]%*%t(Z)%*%Fmatrix.inv%*%epshatoutofsample #compute x_{t|t}
-    epshatinsample <- y[i]-Z%*%xtt[,i] #in-sample forecast error (after y_t has been observed)
-    Ptt[[i]] <- Pttm1[[i]]-Pttm1[[i]]%*%t(Z)%*%Fmatrix.inv%*%Z%*%Pttm1[[i]] #compute P_{t|t}
+    Kg <- Tmatrix%*%Pttm1[[i]]%*%t(Z)%*%Fmatrix.inv 
+    xtt[,i] <- xttm1[,i]+Pttm1[[i]]%*%t(Z)%*%Fmatrix.inv%*%epshatoutofsample 
+    epshatinsample <- y[i]-Z%*%xtt[,i] 
+    Ptt[[i]] <- Pttm1[[i]]-Pttm1[[i]]%*%t(Z)%*%Fmatrix.inv%*%Z%*%Pttm1[[i]] 
     
     Q <- Q     
     
@@ -72,7 +60,7 @@ KFS <- function(y, Tmatrix, Z, H, Q, nstates, d, P10, outofsample){
         if ((NaN %in% logl)==T){
           logl<- -P10[1]
         }
-      } else if (i > d ){ # diffuse log likelihood: 2 nonstationary state variables for y
+      } else if (i > d ){ 
         logl <- logl - 1/2*log(2*pi) - 1/2*log(det(Fmatrix)) - 1/2*t(epshatoutofsample)%*%Fmatrix.inv%*%epshatoutofsample
         if ((NaN %in% logl)==T){
           logl<- -P10[1]
@@ -84,7 +72,7 @@ KFS <- function(y, Tmatrix, Z, H, Q, nstates, d, P10, outofsample){
         if ((NaN %in% logl)==T){
           logl<- -P10[1]
         }
-      } else if (i > d ){ # diffuse log likelihood: 2 nonstationary state variables for y
+      } else if (i > d ){ 
         logl <- logl - 1/2*log(2*pi) - 1/2*log(det(Fmatrix)) - 1/2*t(epshatinsample)%*%Fmatrix.inv%*%epshatinsample
         if ((NaN %in% logl)==T){
           logl<- -P10[1]
@@ -95,7 +83,8 @@ KFS <- function(y, Tmatrix, Z, H, Q, nstates, d, P10, outofsample){
     logl_t[i] <- logl
   } 
   
-  xtm1T <- matrix(0,nstates,len) #smoothed states vector
+  # KF smoother
+  xtm1T <- matrix(0,nstates,len) #smoothed state vector
   Ptm1T <- lapply(seq_len(len), function(X) matrix(0,nstates,nstates)) #smoothed variance of the states vector
   for (i in len:1){
     if (i==len) {
@@ -108,9 +97,10 @@ KFS <- function(y, Tmatrix, Z, H, Q, nstates, d, P10, outofsample){
   }
   
   return(list(logl=-logl, logl_t=logl_t, xttm1=xttm1, Pttm1=Pttm1, xtm1T=xtm1T, Ptm1T=Ptm1T))
-}      # Kalman filter and smoother
+}      
 
 
+# Newton-Raphson algorithm (that uses the KFS to update g)
 NR <- function(y, g, Psi, max.iter, Tmatrix, Z, Q, nstates, d, P10, outofsample){
   
   for (j in 1:max.iter){
@@ -125,8 +115,6 @@ NR <- function(y, g, Psi, max.iter, Tmatrix, Z, Q, nstates, d, P10, outofsample)
     
     invMat <- svd(Psinv + Ainv)$v%*%diag(1/svd(Psinv + Ainv)$d)%*%t(svd(Psinv + Ainv)$u) 
     
-    # g <- invMat%*%(Psinv%*%mu + Ainv%*%z)      # NR step
-    
     g <- t(KFS(y=g + A%*%(y - exp(g)), Tmatrix=Tmatrix, Z=Z, H=A, Q=Q, nstates=nstates, d=d, P10=P10, outofsample=outofsample)$xtm1T)      # KS step
     
     if (j > 1 && g == gplus) break
@@ -135,33 +123,10 @@ NR <- function(y, g, Psi, max.iter, Tmatrix, Z, Q, nstates, d, P10, outofsample)
   }
     
   return(list(g=g, A=A, Ainv=Ainv, z=z, Psinv=Psinv))
-}      # Newton-Raphson algorithm (that uses the KFS to update g)
+}      
 
 
-EIS <- function(logp, theta, w){
-  
-  k <- ncol(logp)
-  
-  n <- nrow(logp)
-  
-  beta <- matrix(NA, nrow=n, ncol=3)
-  
-  for (i in 1:n){
-  
-    y <- logp[i,]
-    
-    X <- cbind(rep(1,k), theta[i,], -1/2*theta[i,]^2)
-    
-    invMat <- svd(t(X)%*%diag(c(w))%*%X)$v%*%diag(1/svd(t(X)%*%diag(c(w))%*%X)$d)%*%t(svd(t(X)%*%diag(c(w))%*%X)$u) 
-    
-    beta[i,] <- invMat%*%t(X)%*%diag(c(w))%*%y
-    
-  }
-  
-  return(list(beta=beta))
-}      # Efficient importance sampling (weighted least squares)
-
-
+# Importance sampling (includes simulation smoothing)
 IS <- function(y, g, n.draws, Psi, Ainv, A=A, z, max.iter, Tmatrix, Z, Q, nstates, d, P10, outofsample){
   
   n <- length(g)
@@ -180,21 +145,13 @@ IS <- function(y, g, n.draws, Psi, Ainv, A=A, z, max.iter, Tmatrix, Z, Q, nstate
     
     theta.plus1 <- rnorm(1,0,P1)      # initialize theta.plus1 from N(a1,P1)
     
-    #theta.plus <- rbind(theta.plus1, t(chol(Psi[-1,-1]))%*%rnorm((n-1),0,1))      # draw theta.plus from g(theta)=N(0,Psi)
-    
     theta.plus <- as.vector(filter(c(theta.plus1, rnorm(n-1,0,sqrt(Q))), filter=c(Tmatrix), method="recursive"))      # draw theta.plus from g(theta)=Z theta_t-1 + eta, eta ~ N(0,Q)
     
-    #y.plus <- rpois(n,lambda=exp(theta.plus))      # use theta.plus to generate y.plus from p(y|theta.plus)
-    
     y.plus <- theta.plus + rnorm(n=n, mean=0, sd=diag(A^(1/2)))      # use theta.plus to generate y.plus from g(y|theta.plus)
-    
-    #theta.plus.hat <- NR(y=y.plus, g=rep(mean(y.plus),n), Psi=Psi, max.iter=max.iter, Tmatrix=Tmatrix, Z=Z, Q=Q, nstates=nstates, d=d, P10=P1, outofsample=outofsample)$g      # E(theta|y.plus)
     
     theta.plus.hat <- t(KFS(y=y.plus, Tmatrix=Tmatrix, Z=Z, H=A, Q=Q, nstates=nstates, d=d, P10=P10, outofsample=outofsample)$xtm1T)
     
     theta.tilde[,s] <- g + theta.plus - theta.plus.hat      # draw from g(theta|y)
-    
-    #ts.plot(cbind(theta,theta.tilde[,s]), col=c("black", "red"))
     
     g_y.theta <- rep(NA, n)      # conditional density g(y|theta)
     
@@ -210,14 +167,11 @@ IS <- function(y, g, n.draws, Psi, Ainv, A=A, z, max.iter, Tmatrix, Z, Q, nstate
       
     mi[s] <- log(p_i) - log(g_i)
     
-    #plot(z[which(g_y.theta>0)]-theta.tilde[,s][which(g_y.theta>0)],g_y.theta[which(g_y.theta>0)])
-    #plot(y,dpois(y, lambda = exp(theta.tilde[,s]), log=F))
-    
   }
   
   return(list(theta.tilde=theta.tilde, w=w, mi=mi))
   
-}      # Importance sampling (includes simulation smoothing)
+}      
 
 
 Everything <- function(par, y, n.draws, Z, max.iter, nstates, d, P10, outofsample, opti, initial){
@@ -245,15 +199,14 @@ Everything <- function(par, y, n.draws, Z, max.iter, nstates, d, P10, outofsampl
   
   Psinv <- NR.results$Psinv
   
-  
   #ts.plot(cbind(theta,g), col=c("black", "red"))
   
-  
+
   #### Simulation smoothing and importance sampling ####
   
   if (initial == F){
     
-    set.seed(281192)      # use the same random numbers in order to evaluate and maximize the log-likelihood
+    set.seed(403)      # use the same random numbers in order to evaluate and maximize the log-likelihood
     
     IS_results <- IS(y=y, g=g, n.draws=n.draws, Psi=Psi, Ainv=Ainv, A=A, z=z, max.iter=max.iter, Tmatrix=Tmatrix, Z=Z, Q=Q, nstates=nstates, d=d, P10=P1, outofsample=outofsample)
     
@@ -269,20 +222,11 @@ Everything <- function(par, y, n.draws, Z, max.iter, nstates, d, P10, outofsampl
     n.draws.bis <- length(w)
     
     
-    # Efficient Importance sampling to calculate b and C
-    #beta <- EIS(logp=dpois(y, lambda = exp(theta.tilde), log=T), theta=theta.tilde, w=w)$beta
-    
-    
-    # Plot estimated and true signals
-    
     exp.x.hat <- 0
     for (s in 1:n.draws.bis){
       exp.x.hat <- exp.x.hat + exp(theta.tilde[,s])*w[s]
     }
     exp.x.hat <- exp.x.hat/sum(w)
-    
-    #ts.plot(cbind(exp(theta),x.hat), col=c("black", "red"))
-    
     
     x.hat <- 0
     for (s in 1:n.draws.bis){
@@ -290,17 +234,13 @@ Everything <- function(par, y, n.draws, Z, max.iter, nstates, d, P10, outofsampl
     }
     x.hat <- x.hat/sum(w)
     
-    #ts.plot(cbind(theta,x.hat), col=c("black", "red"))
-    
     mbar <- mean(mi)
     x.hat.m <- 0
     for (s in 1:n.draws.bis){
       x.hat.m <- x.hat.m + theta.tilde[,s]*exp(mi[s] - mbar)
     }
     x.hat.m <- x.hat.m/sum(exp(mi - mbar))
-    
-    #ts.plot(cbind(theta,x.hat.m), col=c("black", "red"))
-    
+     
   } else {
     
     g_y.theta <- rep(NA, n)      # conditional density g(y|theta)
@@ -334,73 +274,67 @@ Everything <- function(par, y, n.draws, Z, max.iter, nstates, d, P10, outofsampl
 }
   
 
+                  
+set.seed(42)
 
-runs <- 100
+                  
+#### Generate data ####
 
-init <- matrix(NA, nrow=2, ncol=runs)
+n <- 200
 
-for (sim in 1:runs){
+Tmatrix <- 0.5
 
-  #### Generate data ####
-  
-  n <- 200
-  
-  Tmatrix <- 0.5
-  
-  Q <- 0.2
-  
-  dvec <- Tmatrix*rep(0,n)
-  
-  alpha <- as.vector(filter(rnorm(n,0,Q), filter=c(Tmatrix), method="recursive") + dvec)
-  
-  Z <- 1
-  
-  c <- rep(0,n)
-  
-  mu <- c + Z*dvec
-  
-  theta <- c + Z*alpha
-  
-  y <- rpois(n,lambda=exp(theta))
-  
-  
-  # Stacked notation:
-  
-  Tstack <- diag(1, n, n)
-  
-  for (j in 1:(n-1)){
-    for (i in (j+1):n){
-      Tstack[i,j] <- (Tmatrix)^(i-1)
-    }
+Q <- 0.2
+
+dvec <- Tmatrix*rep(0,n)
+
+alpha <- as.vector(filter(rnorm(n,0,Q), filter=c(Tmatrix), method="recursive") + dvec)
+
+Z <- 1
+
+c <- rep(0,n)
+
+mu <- c + Z*dvec
+
+theta <- c + Z*alpha
+
+y <- rpois(n,lambda=exp(theta))
+
+
+# Stacked notation:
+
+Tstack <- diag(1, n, n)
+
+for (j in 1:(n-1)){
+  for (i in (j+1):n){
+    Tstack[i,j] <- (Tmatrix)^(i-1)
   }
-  
-  P1 <- Q
-  
-  Omega <- Tstack%*%diag(c(P1,rep(Q,n-1)))%*%t(Tstack)
-  
-  Zstack <- diag(rep(Z,n))
-  
-  Psi <- Zstack%*%Omega%*%t(Zstack)
-  
-  
-  
-  #### Maximize the log-likelihood ####
-  
-  
-  n.draws <- 5      # number of draws for the importance sampling
-  max.iter <- 100      # maximum number of iterations for the NR algorithm
-  nstates <- 1      # number of state variables
-  d <- 0      # number of nonstationary state variables of y
-  
-  
-  # Get an initial value for the parameters by maximizing the approximate log-likelihood
-  
-  objopt.init <- ucminf(par=c(log(Q)/2,Tmatrix), Everything, y=y, n.draws=n.draws, Z=Z, max.iter=max.iter, 
-                   nstates=nstates, d=d, P10=P1, outofsample=T, opti=T, initial=T, hessian=2, control=list(trace=T))
-  
-  init[,sim] <- objopt.init$par
-
 }
+
+P1 <- Q
+
+Omega <- Tstack%*%diag(c(P1,rep(Q,n-1)))%*%t(Tstack)
+
+Zstack <- diag(rep(Z,n))
+
+Psi <- Zstack%*%Omega%*%t(Zstack)
+                  
+
+
+#### Maximize the log-likelihood ####
+
+n.draws <- 5      # number of draws for the importance sampling
+max.iter <- 100      # maximum number of iterations for the NR algorithm
+nstates <- 1      # number of state variables
+d <- 0      # number of nonstationary state variables of y
+
+
+# Get an initial value for the parameters by maximizing the approximate log-likelihood
+
+objopt.init <- ucminf(par=c(log(Q)/2,Tmatrix), Everything, y=y, n.draws=n.draws, Z=Z, max.iter=max.iter, 
+                 nstates=nstates, d=d, P10=P1, outofsample=T, opti=T, initial=T, hessian=2, control=list(trace=T))
+
+init <- objopt.init$par
 
 
 # Use the initial value to start the maximization of the log-likelihood
@@ -416,22 +350,5 @@ obj <- Everything(par=objopt$par, y=y, n.draws=n.draws, Z=Z, max.iter=max.iter,
                   nstates=nstates, d=d, P10=P1, outofsample=T, opti=F, initial=F)
 
 ts.plot(cbind(theta,obj$x.hat.m), col=c("black", "red"))
-
-
-# Variance of x.hat
-
-n.draws.bis <- ncol(obj$theta.tilde)
-
-x.hat.sq <- 0
-for (s in 1:n.draws.bis){
-  x.hat.sq <- x.hat.sq + (obj$theta.tilde[,s])^2*obj$w[s]
-}
-x.hat.sq <- x.hat.sq/sum(obj$w)
-
-var <- x.hat.sq - obj$x.hat^2
-
-
-ts.plot(cbind(obj$x.hat, obj$x.hat-sqrt(var), obj$x.hat+sqrt(var)), col=c("red"), lty=c(1,2,2))
-
 
 
