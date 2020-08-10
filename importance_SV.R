@@ -119,10 +119,6 @@ NR <- function(y, g, Psi, max.iter, Tmatrix, Z, Q, c.coef, nstates, d, P10, outo
     
     Psinv <- svd(Psi)$v%*%diag(1/svd(Psi)$d)%*%t(svd(Psi)$u) 
     
-    # invMat <- svd(Psinv + Ainv)$v%*%diag(1/svd(Psinv + Ainv)$d)%*%t(svd(Psinv + Ainv)$u) 
-    
-    # g <- invMat%*%(Psinv%*%mu + Ainv%*%z)      # NR step
-    
     g <- t(KFS(y=g + A%*%p.dot, Tmatrix=Tmatrix, Z=Z, H=A, Q=Q, nstates=nstates, d=d, P10=P10, outofsample=outofsample)$xtm1T)      # KS step
     
     if (j > 1 && g == gplus) break
