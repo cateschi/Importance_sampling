@@ -485,21 +485,4 @@ obj <- Everything(par=objopt$par, y=y, n.draws=n.draws, Z=Z, max.iter=max.iter,
 ts.plot(cbind(theta,obj$x.hat.m), col=c("black", "red"))
 
 
-# Variance of x.hat
-
-n.draws.bis <- ncol(obj$theta.tilde)
-
-x.hat.sq <- 0
-for (s in 1:n.draws.bis){
-  x.hat.sq <- x.hat.sq + (obj$theta.tilde[,s])^2*obj$w[s]
-}
-x.hat.sq <- x.hat.sq/sum(obj$w)
-
-var <- x.hat.sq - obj$x.hat^2
-
-
-ts.plot(cbind(obj$x.hat, obj$x.hat-sqrt(var), obj$x.hat+sqrt(var)), col=c("red"), lty=c(1,2,2))
-
-
-
 
