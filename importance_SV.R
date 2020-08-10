@@ -454,7 +454,7 @@ n.draws <- 30      # number of draws for the importance sampling
 max.iter <- 100      # maximum number of iterations for the NR algorithm
 nstates <- 1      # number of state variables
 d <- 0      # number of nonstationary state variables of y
-efficient <- T      # if TRUE, use modified efficient importance sampling instead of SPDK
+efficient <- F      # if TRUE, use modified efficient importance sampling instead of SPDK
 
 
 if (efficient == F){
