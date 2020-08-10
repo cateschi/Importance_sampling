@@ -269,9 +269,6 @@ Everything <- function(par, y, n.draws, Z, max.iter, nstates, d, P10, outofsampl
   
 
                   
-set.seed(42)
-
-                  
 #### Generate data ####
 
 n <- 200
