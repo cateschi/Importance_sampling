@@ -1,9 +1,3 @@
-rm(list=ls())     # Clean memory
-graphics.off()    # Close graphs
-cat("\014")       # Clear Console
-
-
-
 #### Packages ####
 
 library(ucminf)
@@ -338,11 +332,9 @@ init <- objopt.init$par
 
 
 # Use the initial value to start the maximization of the log-likelihood
-
-start.time <- proc.time()
+                  
 objopt <- ucminf(par=init, Everything, y=y, n.draws=n.draws, Z=Z, max.iter=max.iter, 
                  nstates=nstates, d=d, P10=P1, outofsample=T, opti=T, initial=F, hessian=2, control=list(trace=T))
-el.time <- proc.time() - start.time
 
 par <- objopt$par
 
