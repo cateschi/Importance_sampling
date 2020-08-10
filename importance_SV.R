@@ -482,7 +482,7 @@ objopt <- ucminf(par=init, Everything, y=y, n.draws=n.draws, Z=Z, max.iter=max.i
 par <- objopt$par
 
 obj <- Everything(par=objopt$par, y=y, n.draws=n.draws, Z=Z, max.iter=max.iter, 
-                  nstates=nstates, d=d, P10=P1, outofsample=T, opti=F, initial=F)
+                  nstates=nstates, d=d, P10=P1, outofsample=T, opti=F, initial=F, efficient=efficient)
 
 ts.plot(cbind(theta,obj$x.hat.m), col=c("black", "red"))
 
